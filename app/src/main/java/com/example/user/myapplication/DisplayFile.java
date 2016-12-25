@@ -27,6 +27,7 @@ import javax.crypto.spec.SecretKeySpec;
 //**************************************************
 public class DisplayFile extends AppCompatActivity
 {
+    CommonFile commonfile;          //Common file object
     FileHandle handle;              //File handle for file to be read
     String pathName = null;         //path to the file
     SecretKey mSecreteKeySalt = null; //Salt to generate secret key. [Will be keep in saveState]
@@ -60,7 +61,7 @@ public class DisplayFile extends AppCompatActivity
             }
 
             handle = new FileHandle(pathName);                      //Read file using file path
-            initializeBufferSize((int) handle.getFileSize());        //initialize the buffer size
+            initializeBufferSize((int) handle.getFileSize());       //initialize the buffer size
             handle.readFile(filecontent);
 
             TextToDisplay = new String(filecontent);
@@ -74,9 +75,9 @@ public class DisplayFile extends AppCompatActivity
 
             //Convert from byte[] to SecretKey
             mSecreteKeySalt = new SecretKeySpec(savedInstanceState.getByteArray("SaltInByte"),
-                    0,
-                    savedInstanceState.getByteArray("SaltInByte").length,
-                    "DES");
+                                                0,
+                                                savedInstanceState.getByteArray("SaltInByte").length,
+                                                "DES");
         }
 
         //Display to TextView
@@ -225,7 +226,8 @@ public class DisplayFile extends AppCompatActivity
     //  Function    : initializeBufferSize
     //  Description : initialize the buffer using file size
     //----------------------------------------------------------------------------------------------
-    public void initializeBufferSize(int fileSize) {
+    public void initializeBufferSize(int fileSize)
+    {
         filecontent = new byte[fileSize];
         filecontent_ciper = new byte[fileSize];
         filecontent_restore = new byte[fileSize];
@@ -239,10 +241,7 @@ public class DisplayFile extends AppCompatActivity
     //----------------------------------------------------------------------------------------------
     public void writeFile(byte[] salt, byte[] ciper)
     {
-        char[] Charheader = {'E','N','C','R','Y','P','T','E','D'};
-        byte[] Byteheader = toBytes(Charheader);
-
-
+        byte[] Byteheader = commonfile.getByteheader();
         byte[] ByteTowrite = new byte[Byteheader.length + salt.length + ciper.length];
 
         //[ENCRYPTED]
@@ -281,51 +280,79 @@ public class DisplayFile extends AppCompatActivity
     //----------------------------------------------------------------------------------------------
     //  Function    : readFile
     //  Description : 1)Read file
-    //                2)It can be a decrypted or encrypted by
+    //                2)Return ciper text if encrypted
+    //                3)Return Raw content if un-encrypted
     //
+    //                RandomAccessFile  MODE selection
+    //                "r"	Open for reading only. Invoking any of the write methods of the resulting object will cause an IOException to be thrown.
+    //                "rw"	Open for reading and writing. If the file does not already exist then an attempt will be made to create it.
+    //                "rws"	Open for reading and writing, as with "rw", and also require that every update to the file's content or metadata be written synchronously to the underlying storage device.
+    //                "rwd" Open for reading and writing, as with "rw", and also require that every update to the file's content be written synchronously to the underlying storage device.
+    //
+    //
+    //  return : File content (raw or cipertext) in byte array
+    //           caller should check for null fileContent2 before use.
     //----------------------------------------------------------------------------------------------
-    public void readFile(String mPathName,String mode)
+    public byte[] readFile(String mPathName,String mode)
     {
-        char[] Charheader = {'E','N','C','R','Y','P','T','E','D'};
-        byte[] HeaderToCompare = toBytes(Charheader);
+        byte[] HeaderToCompare = commonfile.getByteheader();
         byte[] HeaderFromFile = new byte[HeaderToCompare.length];
+        byte[] fileContent;
+        byte[] fileContent2 = null;
+        long filesize,ciperSize;
+
+        FileHandle handle = new FileHandle(mPathName);
+        filesize = handle.getFileSize();
+        fileContent = new byte[(int)filesize];
+
+        Boolean IsEncrypted = false;
 
         try
         {
             RandomAccessFile RAF = new RandomAccessFile(mPathName, mode);
-            RAF.read(HeaderFromFile,0,HeaderToCompare.length);
+            RAF.read(fileContent,0, (int) filesize);        //read whole file
+
+            //extract file header
+            System.arraycopy(fileContent,
+                             0,
+                             HeaderFromFile,
+                             0,
+                             HeaderFromFile.length
+                             );
 
             //check header
             if(Arrays.equals(HeaderToCompare,HeaderFromFile))
             {
-                //-----This is Encrypted file-----
+                IsEncrypted = true;
+            }
 
+            //Encrypted file
+            if(IsEncrypted)
+            {
+                fileContent2 = new byte[(int)filesize - (int)commonfile.getByteheaderSize() - 32];
 
-
+                System.arraycopy(fileContent,
+                                (int)commonfile.getByteheaderSize() + 32,
+                                 fileContent2,
+                                 0,
+                                 (int)filesize - (int)commonfile.getByteheaderSize() - 32
+                                 );
             }
             else
             {
-                //-----This is un-Encrypted file-----
+                fileContent2 = new byte[(int)filesize];
+                System.arraycopy(fileContent,
+                                 0,
+                                 fileContent2,
+                                 0,
+                                 (int)filesize
+                                 );
             }
-
         }
         catch(Exception e)
         {
             Log.e("Exception :",e.getMessage());
         }
+        return fileContent2;
     }
-
-    private byte[] toBytes(char[] chars)
-    {
-        CharBuffer charBuffer = CharBuffer.wrap(chars);
-        ByteBuffer byteBuffer = Charset.forName("UTF-8").encode(charBuffer);
-        byte[] bytes = Arrays.copyOfRange(byteBuffer.array(),
-                byteBuffer.position(), byteBuffer.limit());
-        Arrays.fill(charBuffer.array(), '\u0000'); // clear sensitive data
-        Arrays.fill(byteBuffer.array(), (byte) 0); // clear sensitive data
-        return bytes;
-    }
-
-
-
 }
