@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Guard</string>
+    <string name="action_settings">Settings</string>
+    <string name="password_dialog">Enter passcode here </string>
+    <string name="Enter_Passcode">Enter Passcode</string>
+</resources>
