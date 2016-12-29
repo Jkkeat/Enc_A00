@@ -8,6 +8,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -62,7 +63,13 @@ public class DisplayFile extends AppCompatActivity
 
             handle = new FileHandle(pathName);                      //Read file using file path
             initializeBufferSize((int) handle.getFileSize());       //initialize the buffer size
-            handle.readFile(filecontent);
+            //handle.readFile(filecontent);
+            filecontent = readFile(pathName,"rw");
+
+            if(filecontent==null)
+            {
+                Toast.makeText(this,"Error : Read contents not available",Toast.LENGTH_LONG);
+            }
 
             TextToDisplay = new String(filecontent);
         }
@@ -299,6 +306,7 @@ public class DisplayFile extends AppCompatActivity
         byte[] HeaderFromFile = new byte[HeaderToCompare.length];
         byte[] fileContent;
         byte[] fileContent2 = null;
+        byte[] saltFromFile = new byte[32];
         long filesize,ciperSize;
 
         FileHandle handle = new FileHandle(mPathName);
@@ -329,14 +337,24 @@ public class DisplayFile extends AppCompatActivity
             //Encrypted file
             if(IsEncrypted)
             {
-                fileContent2 = new byte[(int)filesize - (int)commonfile.getByteheaderSize() - 32];
+                ciperSize = (int)filesize - (int)commonfile.getByteheaderSize() - 32;
+                fileContent2 = new byte[(int)ciperSize];
 
+                //get ciper
                 System.arraycopy(fileContent,
                                 (int)commonfile.getByteheaderSize() + 32,
                                  fileContent2,
                                  0,
                                  (int)filesize - (int)commonfile.getByteheaderSize() - 32
                                  );
+
+                //get salt
+                System.arraycopy(fileContent,
+                                0,
+                                saltFromFile,
+                                0,
+                                32
+                                );
             }
             else
             {
